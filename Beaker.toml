@@ -1,1 +1,4 @@
 name = "examples"
+
+[accounts.cosmwasm]
+mnemonic = "behind peasant joy wool fame accuse couple banner broom athlete village list"
