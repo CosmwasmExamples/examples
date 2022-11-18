@@ -120,3 +120,58 @@ fn handle_instantiate_reply(deps: DepsMut, msg: Reply, state: InstantiateReplySt
     })?;
     Ok(Response::new())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+    use cosmwasm_std::{Addr, SubMsg, ReplyOn};
+
+    #[test]
+    fn proper_initialization() {
+        let mut deps = mock_dependencies();
+        
+        let msg = InstantiateMsg { contract_code_id: 1 };
+        let info = mock_info("creator", &Vec::new());
+
+        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+        assert_eq!(0, res.messages.len());
+        assert_eq!(res.attributes[0].value, "instantiate");
+        assert_eq!(res.attributes[1].value, "creator");
+    }
+
+    #[test]
+    fn execute_add_name() {
+        let mut deps = mock_dependencies();
+
+        let msg = InstantiateMsg { contract_code_id: 1 };
+        let info = mock_info("creator", &vec![]);
+        instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        let info = mock_info("anyone", &vec![]);
+        let msg = ExecuteMsg::AddName { name: "Test".to_string() };
+        let execute_res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
+
+        let state_res = REPLY_STORAGE.load(&deps.storage, INSTANTIATE_REPLY_ID).unwrap();
+        assert_eq!(state_res, InstantiateReplyState {
+            name: "Test".to_string(),
+            owner: Addr::unchecked("anyone"),
+        });
+        let instantiate_msg = CosmosMsg::Wasm(WasmMsg::Instantiate {
+            admin: None,
+            code_id: 1,
+            msg: to_binary(&myname::msg::InstantiateMsg {
+                name: "Test".to_string()
+            })
+            .unwrap(),
+            funds: vec![],
+            label: "Test".to_string()
+        });
+        assert_eq!(execute_res.messages, vec![SubMsg {
+            gas_limit: None,
+            id: INSTANTIATE_REPLY_ID,
+            reply_on: ReplyOn::Success,
+            msg: instantiate_msg.into(),
+        }]);
+    }
+}
