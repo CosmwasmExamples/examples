@@ -12,6 +12,14 @@ pub enum ContractError {
     #[error("Invalid Fund")]
     InvalidFund {},
     
+    #[error("Failed Swap: {reason:?}")]
+    FailedSwap {
+        reason: String
+    },
+
+    #[error("Invalid ReplyID")]
+    InvalidReplyID {},
+
     #[error("Custom Error val: {val:?}")]
     CustomError { val: String },
     // Add any other custom errors you like here.
