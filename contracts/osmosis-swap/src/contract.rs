@@ -1,12 +1,14 @@
+use std::ops::Mul;
 #[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
-use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, coins,
-    Reply, Response, StdResult, SubMsg, SubMsgResult, SubMsgResponse, BankMsg, Uint128};
+use std::str::FromStr;
+use cosmwasm_std::{entry_point, Uint128};
+use cosmwasm_std::{Binary, Deps, DepsMut, Env, MessageInfo, coins, Decimal,
+    Reply, Response, StdResult, SubMsg, SubMsgResult, SubMsgResponse, BankMsg};
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, MigrateMsg};
-use crate::state::SWAP_REPLY_STATES;
+use crate::state::{SWAP_REPLY_STATES, FEE};
 
 use osmosis_std::types::cosmos::base::v1beta1::Coin;
 use osmosis_std::types::osmosis::gamm::v1beta1::{
@@ -25,9 +27,10 @@ pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    _msg: InstantiateMsg,
+    msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+    FEE.save(deps.storage, &msg.fee)?;
 
     Ok(Response::new()
         .add_attribute("method", "instantiate")
@@ -63,7 +66,7 @@ pub mod execute {
         let fund = info.funds[0].clone();
         let route = SwapAmountInRoute {
             pool_id,
-            token_out_denom: denom_out,
+            token_out_denom: denom_out.clone(),
         };
         let swap_msg: CosmosMsg = MsgSwapExactAmountIn {
             sender: env.contract.address.to_string(),
@@ -72,23 +75,20 @@ pub mod execute {
             token_out_min_amount: amount_out_min
         }.into();
 
-        // SWAP_REPLY_STATES.save(deps.storage, &SwapMsgReplyState {
-        //     sender: info.sender,
-        //     denom_out,
-        // })?;
+        SWAP_REPLY_STATES.save(deps.storage, &SwapMsgReplyState {
+            sender: info.sender,
+            denom_out,
+        })?;
+        let submessage = SubMsg::reply_on_success(swap_msg, SWAP_REPLY_ID);
         Ok(Response::new()
             .add_attribute("method", "swap")
-            .add_message(swap_msg))
-        // let submessage = SubMsg::reply_on_success(swap_msg, SWAP_REPLY_ID);
-        // Ok(Response::new()
-        //     .add_attribute("method", "swap")
-        //     .add_submessage(submessage))
+            .add_submessage(submessage))
     }
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(_deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
-    // perform state update or anything neccessary for the migration
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
+    FEE.save(deps.storage, &msg.fee)?;
     Ok(Response::default())
 }
 
@@ -109,19 +109,19 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
 }
 
 fn handle_swap_reply(deps: DepsMut, msg: Reply) -> Result<Response, ContractError> {
-    return Ok(Response::new());
     if let SubMsgResult::Ok(SubMsgResponse { data: Some(b), .. }) = msg.result {
-        return Ok(Response::new())
-        // let swap_state = SWAP_REPLY_STATES.load(deps.storage)?;
-        // let swap_result: MsgSwapExactAmountInResponse = b.try_into().map_err(ContractError::Std)?;
-        // let amount_out = Uint128::from_str(&swap_result.token_out_amount)?;
-        // let transfer_msg = BankMsg::Send {
-        //     to_address: swap_state.sender.to_string(), amount: coins(amount_out.u128(), swap_state.denom_out),
-        // };
-        // return Ok(Response::new()
-        //     .add_attribute("token_out_amount", amount_out)
-        //     .add_message(transfer_msg)
-        // )
+        let swap_state = SWAP_REPLY_STATES.load(deps.storage)?;
+        let fee = FEE.load(deps.storage)?;
+        let swap_result: MsgSwapExactAmountInResponse = b.try_into().map_err(ContractError::Std)?;
+        let amount_after_fee = Decimal::from_str(&swap_result.token_out_amount)? * (Decimal::one() - Decimal::from_ratio(fee, 10000_u64));
+        let amount_out = amount_after_fee.floor().mul(Uint128::one());
+        let transfer_msg = BankMsg::Send {
+            to_address: swap_state.sender.to_string(), amount: coins(amount_out.u128(), swap_state.denom_out),
+        };
+        return Ok(Response::new()
+            .add_attribute("token_out_amount", amount_out)
+            .add_message(transfer_msg)
+        )
     }
     Err(ContractError::FailedSwap {
         reason: msg.result.unwrap_err(),

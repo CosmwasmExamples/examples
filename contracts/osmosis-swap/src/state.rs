@@ -10,4 +10,5 @@ pub struct SwapMsgReplyState {
     pub denom_out: String,
 }
 
+pub const FEE: Item<u64> = Item::new("swap_fee");
 pub const SWAP_REPLY_STATES: Item<SwapMsgReplyState> = Item::new("swap_reply_states");

@@ -2,7 +2,9 @@ use cosmwasm_schema::{cw_serde, QueryResponses};
 
 /// Message type for `instantiate` entry_point
 #[cw_serde]
-pub struct InstantiateMsg {}
+pub struct InstantiateMsg {
+    pub fee: u64 // 100 = 1%
+}
 
 /// Message type for `execute` entry_point
 #[cw_serde]
@@ -15,7 +17,9 @@ pub enum ExecuteMsg {
 }
 
 #[cw_serde]
-pub struct MigrateMsg {}
+pub struct MigrateMsg {
+    pub fee: u64 // 100 = 1%
+}
 
 /// Message type for `query` entry_point
 #[cw_serde]
