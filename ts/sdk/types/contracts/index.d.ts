@@ -3,11 +3,11 @@
 * DO NOT MODIFY IT BY HAND. Instead, modify the source JSONSchema file,
 * and run the @cosmwasm/ts-codegen generate command to regenerate this file.
 */
-
-import * as _0 from "./OsmosisLock.types";
 import * as _1 from "./OsmosisLock.client";
-export namespace contracts {
-  export const OsmosisLock = { ..._0,
-    ..._1
-  };
+export declare namespace contracts {
+    const OsmosisLock: {
+        OsmosisLockQueryClient: typeof _1.OsmosisLockQueryClient;
+        OsmosisLockClient: typeof _1.OsmosisLockClient;
+    };
 }
+//# sourceMappingURL=index.d.ts.map
