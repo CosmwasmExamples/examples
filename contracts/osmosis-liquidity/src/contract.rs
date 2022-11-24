@@ -77,10 +77,10 @@ pub mod execute {
             sender: env.contract.address.to_string(),
             pool_id,
             token_in: Some(Coin { denom: fund.denom, amount: fund.amount.to_string() }),
-            share_out_min_amount: min_shares.clone(),
+            share_out_min_amount: min_shares,
         };
         ADD_LIQUIDITY_STATE.save(deps.storage, &AddLiquidityState {
-            sender: info.sender, pool_id, min_shares })?;
+            sender: info.sender, pool_id })?;
         Ok(Response::new()
             .add_attribute("action", "add_liquidity")
             .add_submessage(SubMsg::reply_on_success(join_pool_msg, ADD_LIQUIDITY_REPLY_ID)),
@@ -99,13 +99,12 @@ pub mod execute {
             pool_id,
             token_out_denom: denom_out.clone(),
             share_in_amount: fund.amount.to_string(),
-            token_out_min_amount: min_tokens_out.clone(),
+            token_out_min_amount: min_tokens_out,
         };
         REMOVE_LIQUIDITY_STATE.save(deps.storage, &RemoveLiquidityState {
             sender: info.sender,
             pool_id,
             denom_out,
-            min_tokens_out,
         })?;
         Ok(Response::new()
             .add_attribute("action", "remove_liquidity")
@@ -135,12 +134,6 @@ fn handle_add_liquidity_reply(deps: DepsMut, msg: Reply) -> Result<Response, Con
         let state = ADD_LIQUIDITY_STATE.load(deps.storage)?;
         let res: MsgJoinSwapExternAmountInResponse = b.try_into().map_err(ContractError::Std)?;
         let share_out_amount_number = Uint128::from_str(&res.share_out_amount)?;
-        let min_shares_number = Uint128::from_str(&state.min_shares)?;
-        if share_out_amount_number < min_shares_number {
-            return Err(ContractError::CustomError {
-                val: format!("share_out < min_share {} {}", share_out_amount_number, min_shares_number)
-            })
-        }
         let denom_out = format!("gamm/pool/{}", state.pool_id);
         let transfer_msg = BankMsg::Send {
             to_address: state.sender.to_string(),
@@ -161,12 +154,6 @@ fn handle_remove_liquidity_reply(deps: DepsMut, msg: Reply) -> Result<Response, 
         let state = REMOVE_LIQUIDITY_STATE.load(deps.storage)?;
         let res: MsgExitSwapShareAmountInResponse = b.try_into().map_err(ContractError::Std)?;
         let token_out_amount_number = Uint128::from_str(&res.token_out_amount)?;
-        let min_tokens_out_number = Uint128::from_str(&state.min_tokens_out)?;
-        if token_out_amount_number < min_tokens_out_number {
-            return Err(ContractError::CustomError {
-                val: format!("token_out < min_token_out {} {}", token_out_amount_number, min_tokens_out_number)
-            })
-        }
         let transfer_msg = BankMsg::Send {
             to_address: state.sender.to_string(),
             amount: coins(token_out_amount_number.u128(), state.denom_out),
