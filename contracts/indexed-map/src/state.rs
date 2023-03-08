@@ -20,7 +20,7 @@ impl IndexList<UserRecord> for UserIndexes<'_> {
       Box::new(v.into_iter())
   }
 }
-pub fn unlocks<'a>() -> IndexedMap<'a, u64, UserRecord, UserIndexes<'a>> {
+pub fn users<'a>() -> IndexedMap<'a, u64, UserRecord, UserIndexes<'a>> {
   let indexes = UserIndexes {
     owner: MultiIndex::new(
       |t| t.owner.clone(),

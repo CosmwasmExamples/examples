@@ -7,7 +7,7 @@ use cw2::set_contract_version;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
-use crate::state::{unlocks, UserRecord};
+use crate::state::{users, UserRecord};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:indexed-map";
@@ -56,7 +56,7 @@ pub fn execute(
 mod execute {
     use super::*;
     pub fn set(deps: DepsMut, info: MessageInfo, id: u64, amount: Uint128) -> Result<Response, ContractError> {
-        unlocks().save(deps.storage, id, &UserRecord {
+        users().save(deps.storage, id, &UserRecord {
             id, amount, owner: info.sender,
         })?;
         Ok(Response::new())
@@ -76,12 +76,12 @@ mod query {
     use super::*;
 
     pub fn get(deps: Deps, id: u64) -> StdResult<UserRecord> {
-        let res = unlocks().load(deps.storage, id)?;
+        let res = users().load(deps.storage, id)?;
         Ok(res)
     }
 
     pub fn get_by_owner(deps: Deps, owner: Addr) -> StdResult<Vec<UserRecord>> {
-        let res = unlocks()
+        let res = users()
             .idx.owner
             .prefix(owner)
             .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
